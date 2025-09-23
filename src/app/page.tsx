@@ -55,18 +55,7 @@ export default function Home() {
 			const response = await fetch(`/api/discover?${params.toString()}`);
 			const data = await response.json();
 
-			// Handle cache loading case (202)
-			if (response.status === 202 && data.error === 'cache_loading') {
-				setError("🔄 Loading Netflix content... Please wait a moment");
-				// Auto-retry after 3 seconds, but only once more
-				setTimeout(() => {
-					setError("🔄 Almost ready... Loading content");
-					setTimeout(() => {
-						handleDiscover();
-					}, 2000);
-				}, 3000);
-				return;
-			}
+			// No more cache loading - direct API calls
 
 			if (!response.ok) {
 				throw new Error(data.message || data.error || "Failed to discover content");

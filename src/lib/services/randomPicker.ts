@@ -1,5 +1,5 @@
-// NetPick - Random Picker Algorithm
-// Intelligent random selection with diversity and quality guarantees
+// NetPick - Simple Random Picker
+// Direct API calls for immediate Netflix content discovery
 
 import {
 	NetflixShow,
@@ -7,12 +7,10 @@ import {
 	DiscoverResponse,
 	SupportedCountry,
 } from "@/lib/types/netflix";
-import { netPickCache, PoolStats } from "./cache";
-import { Metadata } from "next";
+import { streamingAvailabilityService } from "./streamingAvailability";
 
 export interface PickerStats {
 	totalPicks: number;
-	cacheHitRate: number;
 	averageResponseTime: number;
 	lastPickTimestamp: number;
 }
@@ -21,16 +19,14 @@ export class RandomPickerService {
 	private recentPicks: Map<string, NetflixShow[]> = new Map(); // Track recent picks per user
 	private stats: PickerStats = {
 		totalPicks: 0,
-		cacheHitRate: 0,
 		averageResponseTime: 0,
 		lastPickTimestamp: 0,
 	};
 
-	private readonly maxRecentPicks = 20; // Remember last 20 picks per user
-	private readonly recentPicksWindow = 60 * 60 * 1000; // 1 hour
+	private readonly maxRecentPicks = 10; // Remember last 10 picks per user
 
 	/**
-	 * Main discover method - Returns a random Netflix show
+	 * Main discover method - Returns a random Netflix show via direct API call
 	 */
 	async discover(
 		config: RandomPickerConfig,
@@ -76,7 +72,7 @@ export class RandomPickerService {
 			return this.buildResponse(
 				show,
 				config.country as SupportedCountry,
-				true,
+				false, // No cache anymore
 				startTime
 			);
 		} catch (error) {
@@ -86,50 +82,10 @@ export class RandomPickerService {
 	}
 
 	/**
-	 * Get multiple random suggestions
-	 */
-	async getMultipleSuggestions(
-		config: RandomPickerConfig,
-		count: number = 5,
-		userId?: string
-	): Promise<DiscoverResponse[]> {
-		const suggestions: DiscoverResponse[] = [];
-		const attempts = Math.min(count * 2, 20); // Limit attempts
-
-		for (let i = 0; i < attempts && suggestions.length < count; i++) {
-			try {
-				const response = await this.discover(config, userId);
-
-				// Avoid duplicates
-				const isDuplicate = suggestions.some(
-					(s) => s.show.id === response.show.id
-				);
-				if (!isDuplicate) {
-					suggestions.push(response);
-				}
-			} catch (error) {
-				console.warn(
-					`[RandomPicker] Suggestion ${i + 1} failed:`,
-					error
-				);
-			}
-		}
-
-		return suggestions;
-	}
-
-	/**
 	 * Get picker statistics
 	 */
-	getStats(): PickerStats & {
-		cacheStats: Metadata & { poolInfo: Record<string, PoolStats> };
-	} {
-		const cacheStats = netPickCache.getStats();
-
-		return {
-			...this.stats,
-			cacheStats,
-		};
+	getStats(): PickerStats {
+		return { ...this.stats };
 	}
 
 	/**
@@ -147,80 +103,67 @@ export class RandomPickerService {
 	): Promise<NetflixShow | null> {
 		const { country, showType, excludeRecent = true, minRating } = config;
 
-		// Get candidates from cache
-		let candidates: NetflixShow[] = [];
-
-		if (showType === "any" || !showType) {
-			// Mix movies and series
-			const movies = await netPickCache.getRandomShows(
+		try {
+			// Get popular shows from API directly (more reliable)
+			const candidates = await streamingAvailabilityService.getPopularShows(
 				country as SupportedCountry,
-				10,
-				"movie"
+				showType === "any" ? undefined : showType
 			);
-			const series = await netPickCache.getRandomShows(
-				country as SupportedCountry,
-				10,
-				"series"
-			);
-			candidates = [...movies, ...series];
-		} else {
-			candidates = await netPickCache.getRandomShows(
-				country as SupportedCountry,
-				20,
-				showType
-			);
+
+			if (candidates.length === 0) {
+				console.warn(
+					`[RandomPicker] No candidates found for ${country} ${
+						showType || "any"
+					}`
+				);
+				return null;
+			}
+
+			// Apply filters
+			let filteredCandidates = candidates;
+
+			// Filter by minimum rating
+			if (minRating) {
+				filteredCandidates = filteredCandidates.filter(
+					(show) => show.rating >= minRating
+				);
+			}
+
+			// Filter out recent picks for this user
+			if (excludeRecent && userId) {
+				const recentPicks = this.getUserRecentPicks(userId);
+				const recentIds = new Set(recentPicks.map((show) => show.id));
+				filteredCandidates = filteredCandidates.filter(
+					(show) => !recentIds.has(show.id)
+				);
+			}
+
+			// Quality filters
+			filteredCandidates = filteredCandidates.filter((show) => {
+				return (
+					show.title &&
+					show.overview &&
+					show.netflixLink &&
+					show.imageSet?.verticalPoster?.w480 &&
+					show.rating > 0
+				);
+			});
+
+			if (filteredCandidates.length === 0) {
+				console.warn(
+					`[RandomPicker] No shows passed filters for ${country} ${
+						showType || "any"
+					}`
+				);
+				return null;
+			}
+
+			// Use weighted random selection based on rating
+			return this.weightedRandomSelection(filteredCandidates);
+		} catch (error) {
+			console.error("[RandomPicker] API call failed:", error);
+			throw error;
 		}
-
-		if (candidates.length === 0) {
-			console.warn(
-				`[RandomPicker] No candidates found for ${country} ${
-					showType || "any"
-				}`
-			);
-			return null;
-		}
-
-		// Apply filters
-		let filteredCandidates = candidates;
-
-		// Filter by minimum rating
-		if (minRating) {
-			filteredCandidates = filteredCandidates.filter(
-				(show) => show.rating >= minRating
-			);
-		}
-
-		// Filter out recent picks for this user
-		if (excludeRecent && userId) {
-			const recentPicks = this.getUserRecentPicks(userId);
-			const recentIds = new Set(recentPicks.map((show) => show.id));
-			filteredCandidates = filteredCandidates.filter(
-				(show) => !recentIds.has(show.id)
-			);
-		}
-
-		// Quality filters
-		filteredCandidates = filteredCandidates.filter((show) => {
-			return (
-				show.title &&
-				show.overview &&
-				show.netflixLink &&
-				show.imageSet?.verticalPoster?.w480 &&
-				show.rating > 0
-			);
-		});
-
-		if (filteredCandidates.length === 0) {
-			console.warn(
-				`[RandomPicker] No shows passed filters for ${country} ${
-					showType || "any"
-				}`
-			);
-			return null;
-		}
-
-		// Use weighted random selection based on rating and popularity
-		return this.weightedRandomSelection(filteredCandidates);
 	}
 
 	private weightedRandomSelection(shows: NetflixShow[]): NetflixShow {
@@ -259,7 +202,7 @@ export class RandomPickerService {
 			userPicks.splice(this.maxRecentPicks);
 		}
 
-		// Clean old picks
+		// Clean old users
 		this.cleanupOldPicks();
 	}
 
@@ -268,13 +211,10 @@ export class RandomPickerService {
 	}
 
 	private cleanupOldPicks(): void {
-		const cutoff = Date.now() - this.recentPicksWindow;
-
-		// Simple cleanup - in a real app you'd track timestamps
-		if (this.recentPicks.size > 1000) {
-			// Keep only most recent 500 users
+		// Simple cleanup - keep only most recent 100 users
+		if (this.recentPicks.size > 100) {
 			const entries = Array.from(this.recentPicks.entries());
-			entries.splice(500);
+			entries.splice(50); // Keep only first 50
 			this.recentPicks.clear();
 			entries.forEach(([userId, picks]) => {
 				this.recentPicks.set(userId, picks);

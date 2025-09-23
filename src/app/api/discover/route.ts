@@ -73,28 +73,8 @@ export async function GET(request: NextRequest) {
 
     console.log(`[API] Discover request: ${JSON.stringify(config)} from ${clientIP}`);
 
-    // Get random show - with cache check
-    let result;
-    try {
-      result = await randomPickerService.discover(config, userId);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('No Netflix')) {
-        // Cache is still loading, return a loading response
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'cache_loading',
-            message: 'Content is still loading, please try again in a moment...',
-            metadata: {
-              responseTime: Date.now() - startTime,
-              timestamp: new Date().toISOString()
-            }
-          },
-          { status: 202 } // 202 Accepted - request received but not yet acted upon
-        );
-      }
-      throw error; // Re-throw other errors
-    }
+    // Get random show via direct API call
+    const result = await randomPickerService.discover(config, userId);
 
     // Build response
     const response = {
