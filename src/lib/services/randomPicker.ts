@@ -105,10 +105,11 @@ export class RandomPickerService {
 
 		try {
 			// Get popular shows from API directly (more reliable)
-			const candidates = await streamingAvailabilityService.getPopularShows(
-				country as SupportedCountry,
-				showType === "any" ? undefined : showType
-			);
+			const candidates =
+				await streamingAvailabilityService.getPopularShows(
+					country as SupportedCountry,
+					showType === "any" ? undefined : showType
+				);
 
 			if (candidates.length === 0) {
 				console.warn(
