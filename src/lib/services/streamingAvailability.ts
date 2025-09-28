@@ -6,6 +6,8 @@ import {
 	StreamingAvailabilitySearchResponse,
 	SupportedCountry,
 	APIError,
+	StreamingOption,
+	ShowImageSet,
 } from "@/lib/types/netflix";
 
 export interface SearchFiltersParams {
@@ -16,6 +18,29 @@ export interface SearchFiltersParams {
 	orderDirection?: "asc" | "desc";
 	cursor?: string;
 	limit?: number;
+}
+
+export interface ApiShow {
+	id: string;
+	tmdbId?: string;
+	imdbId?: string;
+	title: string;
+	originalTitle?: string;
+	overview?: string;
+	showType: "movie" | "series";
+	releaseYear?: number;
+	firstAirYear?: number;
+	lastAirYear?: number;
+	rating?: number;
+	genres?: string[];
+	runtime?: number;
+	seasonCount?: number;
+	episodeCount?: number;
+	imageSet?: ShowImageSet;
+	streamingOptions?: Partial<Record<SupportedCountry, StreamingOption[]>>;
+	directors?: string[];
+	creators?: string[];
+	cast?: string[];
 }
 
 export class StreamingAvailabilityService {
@@ -82,7 +107,7 @@ export class StreamingAvailabilityService {
 			const data = await response.json();
 
 			// Transform API response to our Netflix show format
-			const shows: NetflixShow[] = data.shows.map((show: any) =>
+			const shows: NetflixShow[] = data.shows.map((show: ApiShow) =>
 				this.transformShow(show, params.country)
 			);
 
@@ -149,12 +174,12 @@ export class StreamingAvailabilityService {
 	 * Transform API response to our NetflixShow interface
 	 */
 	private transformShow(
-		apiShow: any,
+		apiShow: ApiShow,
 		country: SupportedCountry
 	): NetflixShow {
 		// Extract Netflix streaming option for the country
 		const netflixOption = apiShow.streamingOptions?.[country]?.find(
-			(option: any) => option.service.id === "netflix"
+			(option: StreamingOption) => option.service.id === "netflix"
 		);
 
 		return {
@@ -169,7 +194,10 @@ export class StreamingAvailabilityService {
 			firstAirYear: apiShow.firstAirYear,
 			lastAirYear: apiShow.lastAirYear,
 			rating: apiShow.rating || 0,
-			genres: apiShow.genres || [],
+			genres: (apiShow.genres || []).map((genre) => ({
+				id: genre,
+				name: genre,
+			})),
 			runtime: apiShow.runtime,
 			seasonCount: apiShow.seasonCount,
 			episodeCount: apiShow.episodeCount,

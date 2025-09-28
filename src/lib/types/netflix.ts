@@ -152,18 +152,18 @@ export type SupportedCountry = keyof typeof SUPPORTED_COUNTRIES;
 export interface NetPickError {
   code: string;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 export class CacheError extends Error {
-  constructor(message: string, public details?: any) {
+  constructor(message: string, public details?: unknown) {
     super(message);
     this.name = 'CacheError';
   }
 }
 
 export class APIError extends Error {
-  constructor(message: string, public statusCode?: number, public details?: any) {
+  constructor(message: string, public statusCode?: number, public details?: unknown) {
     super(message);
     this.name = 'APIError';
   }
