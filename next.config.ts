@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
 				pathname: "/**",
 			},
 		],
+		formats: ["image/webp", "image/avif"],
+		minimumCacheTTL: 300,
+	},
+	compress: true,
+	poweredByHeader: false,
+	reactStrictMode: true,
+	experimental: {
+		optimizePackageImports: ["@heroicons/react"],
 	},
 };
 
