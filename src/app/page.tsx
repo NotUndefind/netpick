@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import DiscoverButton from "@/components/DiscoverButton";
@@ -58,7 +57,9 @@ export default function Home() {
 			// No more cache loading - direct API calls
 
 			if (!response.ok) {
-				throw new Error(data.message || data.error || "Failed to discover content");
+				throw new Error(
+					data.message || data.error || "Failed to discover content"
+				);
 			}
 
 			if (data.success && data.data.show) {
