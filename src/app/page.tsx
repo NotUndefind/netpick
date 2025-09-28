@@ -63,7 +63,26 @@ export default function Home() {
 			}
 
 			if (data.success && data.data.show) {
-				setCurrentShow(data.data.show);
+				// Ensure genres are properly formatted
+				const show = {
+					...data.data.show,
+					genres: Array.isArray(data.data.show.genres)
+						? data.data.show.genres.map((genre: { id?: string; name?: string }, index: number) => ({
+							id: String(genre.id || genre.name || index),
+							name: String(genre.name || genre.id || 'Unknown')
+						}))
+						: [],
+					cast: Array.isArray(data.data.show.cast)
+						? data.data.show.cast.map((member: string) => String(member))
+						: [],
+					directors: Array.isArray(data.data.show.directors)
+						? data.data.show.directors.map((director: string) => String(director))
+						: [],
+					creators: Array.isArray(data.data.show.creators)
+						? data.data.show.creators.map((creator: string) => String(creator))
+						: []
+				};
+				setCurrentShow(show);
 			} else {
 				throw new Error("No content found");
 			}

@@ -15,6 +15,11 @@ export const metadata: Metadata = {
 	title: "NetPick - Discover Netflix Content",
 	description:
 		"Discover random Netflix movies and series with a single click",
+	icons: {
+		icon: "/favicon.svg",
+		shortcut: "/favicon.svg",
+		apple: "/favicon.svg",
+	},
 };
 
 export default function RootLayout({

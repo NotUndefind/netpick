@@ -157,26 +157,28 @@ export default function ContentCard({
 					</motion.div>
 
 					{/* Genres */}
-					<motion.div
-						className="mb-6"
-						initial={{ opacity: 0, y: 20 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ delay: 0.6 }}
-					>
-						<div className="flex flex-wrap gap-2">
-							{show.genres.slice(0, 4).map((genre, index) => (
-								<motion.span
-									key={genre.id}
-									className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400"
-									initial={{ opacity: 0, scale: 0 }}
-									animate={{ opacity: 1, scale: 1 }}
-									transition={{ delay: 0.7 + index * 0.1 }}
-								>
-									{genre.name}
-								</motion.span>
-							))}
-						</div>
-					</motion.div>
+					{show.genres && show.genres.length > 0 && (
+						<motion.div
+							className="mb-6"
+							initial={{ opacity: 0, y: 20 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={{ delay: 0.6 }}
+						>
+							<div className="flex flex-wrap gap-2">
+								{show.genres.slice(0, 4).map((genre, index) => (
+									<motion.span
+										key={`genre-${index}-${genre.name || genre.id || index}`}
+										className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400"
+										initial={{ opacity: 0, scale: 0 }}
+										animate={{ opacity: 1, scale: 1 }}
+										transition={{ delay: 0.7 + index * 0.1 }}
+									>
+										{genre.name || genre.id || 'Unknown'}
+									</motion.span>
+								))}
+							</div>
+						</motion.div>
+					)}
 
 					{/* Overview */}
 					<motion.div
